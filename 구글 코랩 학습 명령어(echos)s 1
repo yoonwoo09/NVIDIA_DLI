@@ -7,3 +7,8 @@ model.train(
     epochs=50,
     imgsz=640
 )
+
+
+
+
+이것은 런타임 타입을 GPU로 설정해야함.
