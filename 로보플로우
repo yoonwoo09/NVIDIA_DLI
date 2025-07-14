@@ -1,0 +1,1 @@
+라벨링은 모두 수동. 로보플로우에서 train과 valid 이미지가 모두 있어야함. 여기서 format:yolov8이고 show download code로 해야함. 그다음 jupyter로 다운로드 한다음 구글 코랩에 다운로드.
