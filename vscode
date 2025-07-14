@@ -1,0 +1,93 @@
+import socket
+import serial
+import time
+
+HOST = '0.0.0.0'
+PORT = 9999
+
+def open_serial(port='COM19', baudrate=9600):
+    try:
+        ser = serial.Serial(port, baudrate, timeout=1)
+        time.sleep(3)  # 아두이노 초기화 대기
+        print("[INFO] 아두이노 연결 성공")
+        return ser
+    except serial.SerialException as e:
+        print(f"[ERROR] 시리얼 포트 열기 실패: {e}")
+        return None
+
+arduino = open_serial()
+if arduino is None:
+    exit(1)
+
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server.bind((HOST, PORT))
+server.listen(1)
+print(f"[SERVER] Listening on port {PORT}...")
+
+MIN_COMMAND_INTERVAL = 14.0  # 아두이노 명령 처리 시간 (초)
+last_sent = None
+last_sent_time = 0
+
+try:
+    while True:
+        print("[SERVER] Waiting for a client...")
+        conn, addr = server.accept()
+        print(f"[SERVER] Connected by {addr}")
+
+        try:
+            while True:
+                data = conn.recv(1024)
+                if not data:
+                    break
+
+                data_str = data.decode().strip().lower()  # 소문자 통일
+                print("[RECEIVED]", data_str)
+
+                current_time = time.time()
+                # 중복 명령 아니고, 최소 간격 지난 경우에만 전송
+                if data_str != last_sent and (current_time - last_sent_time) >= MIN_COMMAND_INTERVAL:
+                    success = False
+                    retry_count = 0
+                    while not success and retry_count < 3:
+                        try:
+                            arduino.write((data_str + '\n').encode())
+                            print("[SENT TO ARDUINO]", data_str)
+                            last_sent = data_str
+                            last_sent_time = current_time
+                            success = True
+                        except serial.SerialException as e:
+                            print(f"[ERROR] 시리얼 쓰기 실패({retry_count+1}회): {e}")
+                            retry_count += 1
+                            try:
+                                arduino.close()
+                                time.sleep(1)
+                                arduino.open()
+                                print("[INFO] 시리얼 포트 재접속 성공")
+                            except Exception as e2:
+                                print(f"[ERROR] 포트 재접속 실패: {e2}")
+                                time.sleep(1)
+                    if not success:
+                        print("[ERROR] 시리얼 쓰기 3회 실패, 명령 무시")
+                else:
+                    if data_str == last_sent:
+                        print("[INFO] 중복 명령 무시:", data_str)
+                    else:
+                        remain = MIN_COMMAND_INTERVAL - (current_time - last_sent_time)
+                        print(f"[INFO] 명령 간격 부족 {remain:.2f}초 대기 필요")
+
+                time.sleep(0.1)  # 데이터 수신 텀 조금 줌
+
+        except Exception as e:
+            print("[ERROR] 클라이언트 처리 중 오류:", e)
+        finally:
+            conn.close()
+            print("[SERVER] 클라이언트 연결 종료\n")
+
+except KeyboardInterrupt:
+    print("\n[SERVER] 서버 수동 종료 요청 감지")
+
+finally:
+    server.close()
+    if arduino and arduino.is_open:
+        arduino.close()
+    print("[SERVER] 서버와 시리얼 포트 정상 종료")
