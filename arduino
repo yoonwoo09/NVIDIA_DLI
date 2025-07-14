@@ -1,0 +1,72 @@
+#include <Servo.h>
+
+Servo servoCommon1;
+Servo servoCommon2;
+Servo servoSub1;
+Servo servoSub2;
+
+void setup() {
+  Serial.begin(9600);
+
+  servoCommon1.attach(9);
+  servoCommon2.attach(10);
+  servoSub1.attach(11);
+  servoSub2.attach(12);
+
+  // 초기 위치: 공통 0도, 서브 90도 중립
+  servoCommon1.write(0);
+  servoCommon2.write(0);
+  servoSub1.write(90);
+  servoSub2.write(90);
+}
+
+void loop() {
+  if (Serial.available() > 0) {
+    String command = Serial.readStringUntil('\n');
+    command.trim();
+    command.toLowerCase();
+
+    Serial.print("Received: [");
+    Serial.print(command);
+    Serial.println("]");
+
+    // 1) 서브 모터 먼저 움직임
+    if (command == "plastic") {
+      servoSub1.write(90);
+      servoSub2.write(90);
+      Serial.println("Plastic command 실행");
+    }
+    else if (command == "can") {
+      servoSub1.write(180);
+      servoSub2.write(90);
+      Serial.println("Can command 실행");
+    }
+    else if (command == "paper") {
+      servoSub1.write(90);
+      servoSub2.write(180);
+      Serial.println("Paper command 실행");
+    }
+    else {
+      servoSub1.write(90);
+      servoSub2.write(90);
+      Serial.println("알 수 없는 명령");
+    }
+
+    delay(1000); // 서브 모터 1초
+
+    // 2) 공통 모터 90도 벌림
+    servoCommon1.write(90);
+    servoCommon2.write(90);
+
+    delay(1000); // 공통 모터 1초 유지
+
+    // 3) 공통 모터 원위치
+    servoCommon1.write(0);
+    servoCommon2.write(0);
+
+    // 4) 12초 대기 후 서브 모터 원위치 (총 14초 맞춤)
+    delay(12000);
+    servoSub1.write(90);
+    servoSub2.write(90);
+  }
+}
